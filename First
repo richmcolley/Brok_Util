@@ -1,0 +1,211 @@
+my-spring-boot-app/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── example/
+│   │   │           ├── MyApplication.java
+│   │   │           ├── model/
+│   │   │           │   ├── Table1.java
+│   │   │           │   └── Table2.java
+│   │   │           ├── repository/
+│   │   │           │   ├── Table1Repository.java
+│   │   │           │   └── Table2Repository.java
+│   │   │           ├── service/
+│   │   │           │   └── MyService.java
+│   │   │           └── MyApplication.java
+│   │   └── resources/
+│   │       ├── application.properties
+
+----------------------------------------------
+
+@Entity
+public class Table1 {
+    // ... (entity fields, getters, setters)
+}
+
+@Entity
+public class Table2 {
+    // ... (entity fields, getters, setters)
+}
+----------------------------------------------
+
+public interface Table1Repository extends JpaRepository<Table1, Long> {
+    List<Table1> findByServiceType(String serviceType);
+}
+
+public interface Table2Repository extends JpaRepository<Table2, Long> {
+    List<Table2> findByCallerReferenceAndDescriptionAndNotification(
+        String callerReference, String description, String notification
+    );
+}
+------------------------------------------
+
+@Service
+public class MyService {
+    @Autowired
+    private Table1Repository table1Repository;
+
+    @Autowired
+    private Table2Repository table2Repository;
+
+    @Autowired
+    private JavaMailSender javaMailSender; // Inject the mail sender
+
+    public void performQueriesAndSendEmail() {
+        // ... (data processing and email sending logic)
+    }
+
+    private void sendEmailToUser(List<String> mismatchedData) {
+        // ... (email sending logic)
+    }
+}
+-------------------------------------------
+
+@SpringBootApplication
+public class MyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+
+        // Create an instance of MyService and run the data processing and email sending logic
+        ApplicationContext context = SpringApplication.run(MyApplication.class, args);
+        MyService myService = context.getBean(MyService.class);
+        myService.performQueriesAndSendEmail();
+    }
+}
+------------------------------------------
+
+# Database Configuration
+spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=your_database_name
+spring.datasource.username=your_database_username
+spring.datasource.password=your_database_password
+spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+# Hibernate Configuration
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServer2012Dialect
+
+# Email Configuration
+spring.mail.host=your_smtp_host
+spring.mail.port=your_smtp_port
+spring.mail.username=your_email_username
+spring.mail.password=your_email_password
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+--------------------------------------------
+
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyService {
+    @Autowired
+    private Table1Repository table1Repository;
+
+    @Autowired
+    private Table2Repository table2Repository;
+
+    @Autowired
+    private JavaMailSender javaMailSender; // Inject the mail sender
+
+    public void performQueriesAndSendEmail() {
+        // First query
+        List<Table1> table1Results = table1Repository.findByServiceType("ServiceResponse");
+
+        // Initialize a list to store mismatched data
+        List<String> mismatchedData = new ArrayList<>();
+
+        // Process the results of the first query
+        for (Table1 table1Result : table1Results) {
+            String callerReference = table1Result.getCallerReference();
+            String description = table1Result.getDescription();
+
+            // Second query using values from the first query
+            List<Table2> table2Results = table2Repository.findByCallerReferenceAndDescriptionAndNotification(
+                callerReference, description, "Asset_test_received"
+            );
+
+            // Check if data exists in the second query results
+            if (table2Results.isEmpty()) {
+                // Data doesn't exist, add to the mismatched data list
+                mismatchedData.add("Caller Reference: " + callerReference +
+                    ", Description: " + description);
+            } else {
+                // Data exists, process the result
+                for (Table2 table2Result : table2Results) {
+                    // Process the result as needed
+                    System.out.println("Table2 Result: " + table2Result.getId());
+                }
+            }
+        }
+
+        // Send an email with all mismatched data
+        if (!mismatchedData.isEmpty()) {
+            sendEmailToUser(mismatchedData);
+        }
+    }
+
+    private void sendEmailToUser(List<String> mismatchedData) {
+        // Create a SimpleMailMessage
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo("user@example.com");
+        message.setSubject("Mismatched Data Report");
+        
+        // Construct the email body with all mismatched data
+        StringBuilder emailBody = new StringBuilder();
+        emailBody.append("The following data does not exist in the second query:\n\n");
+        for (String data : mismatchedData) {
+            emailBody.append(data).append("\n");
+        }
+        message.setText(emailBody.toString());
+
+        // Send the email
+        javaMailSender.send(message);
+    }
+}
+---------------------------------------------
+
+<dependencies>
+    <!-- Other dependencies -->
+
+    <!-- SQL Server JDBC driver -->
+    <dependency>
+        <groupId>com.microsoft.sqlserver</groupId>
+        <artifactId>mssql-jdbc</artifactId>
+        <version>9.2.1.jre15</version>
+    </dependency>
+</dependencies>
+-------------------------------------------
+
+<!-- Spring Boot Starter -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter</artifactId>
+</dependency>
+
+<!-- Spring Boot Starter Data JPA -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+
+<!-- Spring Boot Starter Web -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+
+<!-- Spring Boot Starter Mail -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
+
+<!-- Microsoft SQL Server JDBC Driver -->
+<dependency>
+    <groupId>com.microsoft.sqlserver</groupId>
+    <artifactId>mssql-jdbc</artifactId>
+    <version>9.4.0.jre11</version>
+</dependency>
+
